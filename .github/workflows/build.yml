@@ -1,0 +1,75 @@
+name: Build Bun Docker Image
+
+on:
+  push:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            bun-arch: x64
+          - arch: arm64
+            bun-arch: aarch64
+    outputs:
+      BUN_VERSION: ${{ steps.get_bun_version.outputs.BUN_VERSION }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Get latest Bun version
+        id: get_bun_version
+        run: |
+          VERSION=$(curl https://api.github.com/repos/oven-sh/bun/releases/latest | jq '.tag_name | ltrimstr("bun-v")' -r)
+          echo "BUN_VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "BUN_VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Install Chisel
+        run: go install github.com/canonical/chisel/cmd/chisel@latest
+
+      - name: Create Rootfs
+        run: mkdir rootfs
+
+      - name: Download Bun into Rootfs
+        run: |
+          wget https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${{ matrix.bun-arch }}.zip
+          unzip bun*.zip
+          mkdir -p rootfs/bin
+          mv bun*/bun rootfs/bin
+
+      - name: Install Dependencies
+        run: ~/go/bin/chisel cut --arch=${{ matrix.arch }} --release ubuntu-22.04 --root rootfs/ libgcc-s1_libs libssl3_libs bash_bins
+
+      - name: Build Image
+        run: docker build --platform linux/${{ matrix.arch }} -t ghcr.io/shyim/bun-docker:${BUN_VERSION}-${{ matrix.arch }} .
+
+      - name: Login into Github Docker Registery
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push
+        run: docker push ghcr.io/shyim/bun-docker:${BUN_VERSION}-${{ matrix.arch }}
+      
+  merge:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login into Github Docker Registery
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Get Bun version form previous Job
+        run: echo "BUN_VERSION=${{ needs.build.outputs.BUN_VERSION }}" >> "$GITHUB_ENV"
+
+      - run: docker manifest create ghcr.io/shyim/bun-docker:${BUN_VERSION} --amend ghcr.io/shyim/bun-docker:${BUN_VERSION}-amd64 --amend ghcr.io/shyim/bun-docker:${BUN_VERSION}-arm64
+
+      - run: docker manifest create ghcr.io/shyim/bun-docker:latest --amend ghcr.io/shyim/bun-docker:${BUN_VERSION}-amd64 --amend ghcr.io/shyim/bun-docker:${BUN_VERSION}-arm64
+
+      - run: docker manifest push ghcr.io/shyim/bun-docker:${BUN_VERSION}
+
+      - run: docker manifest push ghcr.io/shyim/bun-docker:latest
+    
