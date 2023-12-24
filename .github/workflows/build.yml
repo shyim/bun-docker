@@ -2,6 +2,8 @@ name: Build Bun Docker Image
 
 on:
   push:
+  schedule:
+    - cron: '5 3 * * *'
 
 permissions:
   contents: read
