@@ -46,7 +46,7 @@ jobs:
           mv bun*/bun rootfs/bin
 
       - name: Install Dependencies
-        run: ~/go/bin/chisel cut --arch=${{ matrix.arch }} --release ubuntu-22.04 --root rootfs/ libgcc-s1_libs libssl3_libs bash_bins
+        run: chisel cut --arch=${{ matrix.arch }} --release ubuntu-22.04 --root rootfs/ libgcc-s1_libs libssl3_libs bash_bins
 
       - name: Build Image
         run: docker build --platform linux/${{ matrix.arch }} -t ghcr.io/shyim/bun-docker:${BUN_VERSION}-${{ matrix.arch }} .
