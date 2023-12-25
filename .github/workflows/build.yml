@@ -33,7 +33,7 @@ jobs:
           echo "BUN_VERSION=${VERSION}" >> "$GITHUB_ENV"
 
       - name: Install Chisel
-        run: go install github.com/canonical/chisel/cmd/chisel@latest
+        uses: shyim/chisel-installer@main
 
       - name: Create Rootfs
         run: mkdir rootfs
