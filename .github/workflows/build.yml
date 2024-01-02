@@ -2,6 +2,7 @@ name: Build Bun Docker Image
 
 on:
   push:
+  workflow_dispatch:
   schedule:
     - cron: '5 3 * * *'
 
